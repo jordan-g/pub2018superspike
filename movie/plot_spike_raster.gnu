@@ -8,8 +8,8 @@ unset key
 set term png size 800,600 font 'Helvetica,12'
 
 theme = "oxford"
-outputdir = sprintf("/tmp/%s", theme)
-datadir = sprintf("../output/symfb/%s/eta1e-3", theme)
+outputdir = sprintf("../tmp/%s", theme)
+datadir = sprintf("../output/rfb/%s/eta1e-3", theme)
 print datadir
 
 gridsize = 1.29
@@ -26,6 +26,7 @@ framerate = 10.0
 # loop over frames
 do for [i=0:600] {
 	print(sprintf("Plotting frame %i",i))
+	print(sprintf('%s/frame%06i.png',outputdir,i))
 	set out sprintf('%s/frame%06i.png',outputdir,i)
 	load 'draw_frame.gnu'
 }

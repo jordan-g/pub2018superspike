@@ -1,7 +1,7 @@
 # shorthand for your MPI C++ compiler
 CC = mpicxx
 # Your Auryn install path
-AURYNDIR = $(HOME)/auryn/
+AURYNDIR = $(HOME)/Documents/Ph.D.\ Project/3.\ Feedback\ Weight\ Learning\ Model/auryn/
 # Path to libauryn.a (see compiling Auryn)
 BUILDDIR = $(AURYNDIR)/build/release/
 
@@ -19,8 +19,8 @@ LDFLAGS=$(BUILDDIR)/src/libauryn.a \
 #         -I$(AURYNDIR)/src -I$(AURYNDIR)/dev/src
 
 
-OBJECTS=SuperSpikeConnection.o RFSuperSpikeConnection.o ErrorConnection.o StateWatcherGroup.o
-SIMULATIONS=sim_symfb sim_rfb
+OBJECTS=SuperSpikeConnection.o RFSuperSpikeConnection.o ErrorConnection.o LearnedErrorConnection.o StateWatcherGroup.o JIafPscExpGroup.o
+SIMULATIONS=sim_symfb sim_rfb sim_lfb
 
 .SECONDARY:
 

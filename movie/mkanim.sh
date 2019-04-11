@@ -1,7 +1,7 @@
 #!/bin/sh
 
 THEME="oxford"
-TMPDIR="/tmp/$THEME"
+TMPDIR="../tmp/$THEME"
 
 # Create output dir if not existing
 mkdir -p $TMPDIR
@@ -13,7 +13,7 @@ rm -f $TMPDIR/*.png
 gnuplot plot_spike_raster.gnu
 
 # make animated gif
-convert -delay 1 -loop 0 $TMPDIR/*.png ${THEME}.gif
+# convert -delay 1 -loop 0 $TMPDIR/*.png ${THEME}.gif
 
 # make mpg
 # convert -delay 10 -quality 95 $TMPDIR/*.png ${THEME}.mpg
