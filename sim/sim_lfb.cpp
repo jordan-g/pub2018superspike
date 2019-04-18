@@ -43,6 +43,10 @@ bool record_synapses = true;
 double epsilon = 1e-12;
 bool partial_enabled = true;
 
+std::ofstream Ws_file;
+std::ofstream Ys_file;
+std::ofstream betas_file;
+
 string connection_stats_string(SparseConnection * con)
 {
 	std::stringstream oss;
@@ -302,7 +306,7 @@ int main(int ac, char* av[])
 
 	// BEGIN Global definitions
 	auryn_init(ac, av);
-	sys->set_simulation_name("rfb");
+	sys->set_simulation_name("lfb");
 	sys->set_output_dir(outputdir);
 	sys->set_master_seed(121);
 	// END Global definitions
@@ -369,14 +373,14 @@ int main(int ac, char* av[])
 	con_out->partial_enabled = partial_enabled;
 
 
-
+	LearnedErrorConnection * scon;
 	// logger->msg("Setting up random feedback...", PROGRESS, true);
 	for ( NeuronID l = 0 ; l < num_hidden_layers ; ++l ) {
 		NeuronGroup  * etrg = hidden_layers[l]->neurons;
 		// SparseStateConnection * scon = new SparseStateConnection(neurons_out, etrg, 1.0, 1.0);
 		// scon->connect_state("err");
 		logger->msg("Adding long-range feedback connection", PROGRESS, true);
-		LearnedErrorConnection * scon = new LearnedErrorConnection(neurons_out, etrg, 1.0, 1.0);
+		scon = new LearnedErrorConnection(neurons_out, etrg, 1.0, 1.0);
 		scon->random_data(0.0,1.0);
 	}
 	
@@ -482,10 +486,59 @@ int main(int ac, char* av[])
 	logger->msg("Burn-in...", PROGRESS, true);
 	for ( NeuronID i = 0 ; i < num_hidden_layers ; ++i ) hidden_layers[i]->set_stdp_active(false);
 	con_out->stdp_active = false;
-	sys->run(simtime); // burn-in time
-	sys->flush_devices();
+	scon->learning_active = false;
+	// sys->run(simtime); // burn-in time
+	// sys->flush_devices();
 	for ( NeuronID i = 0 ; i < num_hidden_layers ; ++i ) hidden_layers[i]->set_stdp_active(true);
 	con_out->stdp_active = true;
+
+	Ws_file.open("Ws.txt");
+	Ys_file.open("Ys.txt");
+	betas_file.open("betas.txt");
+	Ws_file << "";
+	Ys_file << "";
+	betas_file << "";
+	Ws_file.close();
+	Ys_file.close();
+	betas_file.close();
+
+	Ws_file.open("Ws.txt", std::ios_base::app);
+	Ys_file.open("Ys.txt", std::ios_base::app);
+	betas_file.open("betas.txt", std::ios_base::app);
+	
+	float percent_aligned = 0;
+	float percent_aligned_beta = 0;
+	for (int i = 0; i < nout; i++) {
+		for (int j = 0; j < nhidden; j++) {
+			AurynWeight w = con_out->w->get_data(j*nout + i);
+			AurynWeight y = scon->w->get_data(i*nhidden + j);
+			float beta = scon->betas->get(i*nhidden + j);
+			int w_sign = (w > 0) - (w < 0);
+			int y_sign = (y > 0) - (y < 0);
+			int beta_sign = (beta > 0) - (beta < 0);
+			if (w_sign == y_sign) {
+				percent_aligned += 1;
+			}
+
+			if (w_sign == beta_sign) {
+				percent_aligned_beta += 1;
+			}
+
+			Ws_file << w << " ";
+			Ys_file << y << " ";
+			betas_file << beta << " ";
+		}
+	}
+	percent_aligned *= 100.0/(nout*nhidden);
+	percent_aligned_beta *= 100.0/(nout*nhidden);
+	std::cout << "Weight alignment: " << percent_aligned << "% | " << percent_aligned_beta << "%.\n";
+
+	Ws_file << "\n";
+	Ys_file << "\n";
+	betas_file << "\n";
+	Ws_file.close();
+	Ys_file.close();
+	betas_file.close();
 
 	// simblocks = 0;
 	for ( unsigned int blk = 0 ; blk < simblocks ; ++blk ) {
@@ -518,12 +571,95 @@ int main(int ac, char* av[])
 			voltagemons.at(i)->record_for(test_time);
 		}
 
-		sys->run(test_time);
-		sys->flush_devices();
 
+		for (int p = 0; p < 100; p++) {
+			// if (p > 2) {
+			// 	scon->fb_lr = 0.01;
+			// }
+			if (p > 5) {
+				scon->learning_active = true;
+			}
+			sys->run(test_time);
+
+			Ws_file.open("Ws.txt", std::ios_base::app);
+			Ys_file.open("Ys.txt", std::ios_base::app);
+			betas_file.open("betas.txt", std::ios_base::app);
+			
+			percent_aligned = 0;
+			percent_aligned_beta = 0;
+			for (int i = 0; i < nout; i++) {
+				for (int j = 0; j < nhidden; j++) {
+					AurynWeight w = con_out->w->get_data(j*nout + i);
+					AurynWeight y = scon->w->get_data(i*nhidden + j);
+					float beta = scon->betas->get(i*nhidden + j);
+					int w_sign = (w > 0) - (w < 0);
+					int y_sign = (y > 0) - (y < 0);
+					int beta_sign = (beta > 0) - (beta < 0);
+					if (w_sign == y_sign) {
+						percent_aligned += 1;
+					}
+
+					if (w_sign == beta_sign) {
+						percent_aligned_beta += 1;
+					}
+
+					Ws_file << w << " ";
+					Ys_file << y << " ";
+					betas_file << beta << " ";
+				}
+			}
+			percent_aligned *= 100.0/(nout*nhidden);
+			percent_aligned_beta *= 100.0/(nout*nhidden);
+			std::cout << "Weight alignment: " << percent_aligned << "% | " << percent_aligned_beta << "%.\n";
+
+			Ws_file << "\n";
+			Ys_file << "\n";
+			betas_file << "\n";
+			Ws_file.close();
+			Ys_file.close();
+			betas_file.close();
+		}
 
 		// Train
 		sys->run(simtime-test_time);
+
+		Ws_file.open("Ws.txt", std::ios_base::app);
+		Ys_file.open("Ys.txt", std::ios_base::app);
+		betas_file.open("betas.txt", std::ios_base::app);
+		
+		percent_aligned = 0;
+		percent_aligned_beta = 0;
+		for (int i = 0; i < nout; i++) {
+			for (int j = 0; j < nhidden; j++) {
+				AurynWeight w = con_out->w->get_data(j*nout + i);
+				AurynWeight y = scon->w->get_data(i*nhidden + j);
+				float beta = scon->betas->get(i*nhidden + j);
+				int w_sign = (w > 0) - (w < 0);
+				int y_sign = (y > 0) - (y < 0);
+				int beta_sign = (beta > 0) - (beta < 0);
+				if (w_sign == y_sign) {
+					percent_aligned += 1;
+				}
+
+				if (w_sign == beta_sign) {
+					percent_aligned_beta += 1;
+				}
+
+				Ws_file << w << " ";
+				Ys_file << y << " ";
+				betas_file << beta << " ";
+			}
+		}
+		percent_aligned *= 100.0/(nout*nhidden);
+		percent_aligned_beta *= 100.0/(nout*nhidden);
+		std::cout << "Weight alignment: " << percent_aligned << "% | " << percent_aligned_beta << "%.\n";
+
+		Ws_file << "\n";
+		Ys_file << "\n";
+		betas_file << "\n";
+		Ws_file.close();
+		Ys_file.close();
+		betas_file.close();
 	}
 
 	logger->msg("Running one grid marker with plasticity disabled...", PROGRESS, true);

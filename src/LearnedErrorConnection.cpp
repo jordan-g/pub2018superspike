@@ -25,8 +25,20 @@
 
 #include "LearnedErrorConnection.h"
 #include "JIafPscExpGroup.h"
+#include <iostream>
+#include <fstream>
+#include <stdlib.h>
 
 using namespace auryn;
+
+std::ofstream rdd_param_0_file;
+std::ofstream rdd_param_1_file;
+std::ofstream rdd_param_2_file;
+std::ofstream rdd_param_3_file;
+std::ofstream rdd_feedback_file;
+std::ofstream max_drive_file;
+std::ofstream beta_file;
+std::ofstream y_file;
 
 LearnedErrorConnection::LearnedErrorConnection( 
 		SpikingGroup * source, 
@@ -51,13 +63,44 @@ LearnedErrorConnection::LearnedErrorConnection(
 	set_min_weight(-1e42); // whatever
 	set_max_weight(1e42);
 
-	rdd_params = new ComplexMatrix <float> (get_m_rows(), get_n_cols(), 256, 4);
-	rdd_params->fill_zeros();
+	rdd_param_0 = new AurynVector< float > (get_m_rows()*get_n_cols());
+	// rdd_param_0->set_all(1.0);
+	rdd_param_1 = new AurynVector< float > (get_m_rows()*get_n_cols());
+	// rdd_param_1->set_all(1.0);
+	rdd_param_2 = new AurynVector< float > (get_m_rows()*get_n_cols());
+	rdd_param_3 = new AurynVector< float > (get_m_rows()*get_n_cols());
+	rdd_feedback = new AurynVector< float > (get_m_rows()*get_n_cols());
+	betas = new AurynVector< float > (get_m_rows()*get_n_cols());
 
-	rdd_feedback = new ComplexMatrix <float> (get_m_rows(), get_n_cols(), 256, 1);
-	rdd_feedback->fill_zeros();
+	fb_lr = 0.005;
 
-	fb_lr = 0.00001;
+	learning_active = false;
+
+	rdd_param_0_file.open("rdd_param_0.txt");
+	rdd_param_1_file.open("rdd_param_1.txt");
+	rdd_param_2_file.open("rdd_param_2.txt");
+	rdd_param_3_file.open("rdd_param_3.txt");
+	rdd_feedback_file.open("rdd_feedback.txt");
+	max_drive_file.open("max_drive.txt");
+	beta_file.open("beta.txt");
+	y_file.open("y.txt");
+	rdd_param_0_file << "";
+	rdd_param_1_file << "";
+	rdd_param_2_file << "";
+	rdd_param_3_file << "";
+	rdd_feedback_file << "";
+	max_drive_file << "";
+	beta_file << "";
+	y_file << "";
+	rdd_param_0_file.close();
+	rdd_param_1_file.close();
+	rdd_param_2_file.close();
+	rdd_param_3_file.close();
+	rdd_feedback_file.close();
+	max_drive_file.close();
+	beta_file.close();
+	y_file.close();
+
 }
 
 LearnedErrorConnection::~LearnedErrorConnection()
@@ -110,76 +153,107 @@ void LearnedErrorConnection::evolve()
 	// get RDD times for each post-synaptic neuron
 	unsigned short * t_rdd = dest->t_rdd;
 
-	for (AurynLong j = 0 ; j < get_n_cols() ; ++j ) {
+	for (NeuronID j = 0 ; j < get_n_cols() ; ++j ) {
 
 		// only update feedback weights if RDD window is ending
 		if (t_rdd[j]==1) {
 		 	// see if the post-synaptic neuron spiked
 			AurynFloat max_drive = (dest->t_max_drive)[j];
 
-			for (AurynLong i = 0 ; i < get_m_rows() ; ++i ) {
+			for (NeuronID i = 0 ; i < get_m_rows() ; ++i ) {
+
+				int ind = i*get_n_cols() + j;
 
 				AurynLong index = w->get_data_index(i, j);
 
+				// if (max_drive > dest->thr && max_drive < dest->thr + 0.001) {
 				if (max_drive > dest->thr) {
 					// post-synaptic neuron spiked
-					AurynFloat error_term = (rdd_params->get_element(index, 2))*max_drive + rdd_params->get_element(index, 0) - rdd_feedback->get(i, j);
+					AurynFloat error_term = (rdd_param_2->get(ind))*(max_drive - dest->thr) + rdd_param_0->get(ind) - rdd_feedback->get(ind);
 
-					rdd_params->set_element(index, rdd_params->get_element(index, 2)-fb_lr*error_term*max_drive, 2);
-					rdd_params->set_element(index, rdd_params->get_element(index, 0)-fb_lr*error_term, 0);
+					// std::cout << max_drive*1000 << "\n";
+					// rdd_param_2->set(ind, rdd_param_2->get(ind)-exp(-abs(max_drive - dest->thr)/0.01)*fb_lr*error_term*max_drive);
+					// rdd_param_0->set(ind, rdd_param_0->get(ind)-exp(-abs(max_drive - dest->thr)/0.01)*fb_lr*error_term);
+
+					rdd_param_2->set(ind, rdd_param_2->get(ind)-fb_lr*error_term*(max_drive - dest->thr));
+					rdd_param_0->set(ind, rdd_param_0->get(ind)-fb_lr*error_term);
+
+					// if (rdd_feedback->get(ind) == 0) {
+					// 	rdd_param_0->set(ind, rdd_param_0->get(ind)-0.01);
+					// } else {
+					// 	rdd_param_0->set(ind, rdd_param_0->get(ind)+0.01);
+					// }
+
+				// } else if (max_drive > dest->thr - 0.001) {
 				} else {
 					// post-synaptic neuron did not spike
-					AurynFloat error_term = (rdd_params->get_element(index, 3))*max_drive + rdd_params->get_element(index, 1) - rdd_feedback->get(i, j);
+					AurynFloat error_term = (rdd_param_3->get(ind))*(max_drive - dest->thr) + rdd_param_1->get(ind) - rdd_feedback->get(ind);
 
-					rdd_params->set_element(index, rdd_params->get_element(index, 3)-fb_lr*error_term*max_drive, 3);
-					rdd_params->set_element(index, rdd_params->get_element(index, 1)-fb_lr*error_term, 1);
+					// rdd_param_3->set(ind, rdd_param_3->get(ind)-exp(-abs(max_drive - dest->thr)/0.01)*fb_lr*error_term*max_drive);
+					// rdd_param_1->set(ind, rdd_param_1->get(ind)-exp(-abs(max_drive - dest->thr)/0.01)*fb_lr*error_term);
+
+					rdd_param_3->set(ind, rdd_param_3->get(ind)-fb_lr*error_term*(max_drive - dest->thr));
+					rdd_param_1->set(ind, rdd_param_1->get(ind)-fb_lr*error_term);
+
+					// if (rdd_feedback->get(ind) == 0) {
+					// 	rdd_param_0->set(ind, rdd_param_0->get(ind)+0.01);
+					// } else {
+					// 	rdd_param_0->set(ind, rdd_param_0->get(ind)-0.01);
+					// }
 				}
 
-				AurynFloat beta = (rdd_params->get_element(index, 2))*max_drive + rdd_params->get_element(index, 0) - (rdd_params->get_element(index, 3))*max_drive + rdd_params->get_element(index, 1);
+				AurynFloat beta = rdd_param_0->get(ind) - (rdd_param_1->get(ind));
+				betas->set(ind, beta);
 
-				AurynWeight w_val = w->get_data(index);
-				w->set(i, j, w_val + 0.01*(beta - w_val));
+				AurynWeight w_val = w->get(i, j);
 
-				// if (index == 100) {
-				// std::cout << beta << " \n";
-				// }
+				int w_sign = (w_val > 0) - (w_val <= 0);
+				int beta_sign = (beta > 0) - (beta <= 0);
+
+				if (learning_active) {
+					w->set(i, j, w_val + 0.01*(beta - w_val));
+				}
+
+				if (i == 1 && j == 0) {
+					rdd_param_0_file.open("rdd_param_0.txt", std::ios_base::app);
+					rdd_param_1_file.open("rdd_param_1.txt", std::ios_base::app);
+					rdd_param_2_file.open("rdd_param_2.txt", std::ios_base::app);
+					rdd_param_3_file.open("rdd_param_3.txt", std::ios_base::app);
+					rdd_feedback_file.open("rdd_feedback.txt", std::ios_base::app);
+					max_drive_file.open("max_drive.txt", std::ios_base::app);
+					beta_file.open("beta.txt", std::ios_base::app);
+					y_file.open("y.txt", std::ios_base::app);
+					rdd_param_0_file << rdd_param_0->get(ind) << "\n";
+					rdd_param_1_file << rdd_param_1->get(ind) << "\n";
+					rdd_param_2_file << rdd_param_2->get(ind) << "\n";
+					rdd_param_3_file << rdd_param_3->get(ind) << "\n";
+					rdd_feedback_file << rdd_feedback->get(ind) << "\n";
+					max_drive_file << max_drive << "\n";
+					beta_file << beta << "\n";
+					y_file << w->get(i, j) << "\n";
+					rdd_param_0_file.close();
+					rdd_param_1_file.close();
+					rdd_param_2_file.close();
+					rdd_param_3_file.close();
+					rdd_feedback_file.close();
+					max_drive_file.close();
+					beta_file.close();
+					y_file.close();
+				}
+
+				rdd_feedback->set(ind, 0);
 			}
-
-			rdd_feedback->set_col(j, 0);
 		} else if ((t_rdd[j]) > 0) {
-
-			NeuronID * ind = w->get_row_begin(0);
-
 			// add feedback
 			for (NeuronID i = 0 ; i < state_watcher->get_spikes()->size() ; ++i ) {
 				const NeuronID spike = state_watcher->get_spikes()->at(i);
 
-				AurynFloat rdd_val = rdd_feedback->get(spike, j);
+				int ind = spike*get_n_cols() + j;
 
-				rdd_feedback->set(spike, j, rdd_val + 1);
+				AurynFloat rdd_val = rdd_feedback->get(ind);
+
+				rdd_feedback->set(ind, rdd_val + 1.0*(t_rdd[j]/(float)(dest->rdd_time)));
 	 		}
 		}
 	}
-
-	// counter++;
-
-	// std::cout << state_watcher->get_spikes()->size() << " ";
-
-	// std::cout << " ";
-	// for (AurynLong i = 0 ; i < w->get_nonzero() ; ++i ) {
-
-	// 	for (NeuronID * c = w->get_row_begin(spike) ; 
-	// 			c != w->get_row_end(spike) ; 
-	// 			++c ) {
-
-	//     AurynWeight weight = w->get_data(i);
-	//     // do something with the weight
-	//     weight = 0;
-	//     w->set(0, 0, 0);
-	//     std::cout << w->get(0, 1);
-	// }
-
-
-	// w->set(0, 0, 0);
-	// std::cout << w->get(0, 1);
 }

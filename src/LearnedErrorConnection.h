@@ -70,9 +70,14 @@ protected:
 public:
 	StateWatcherGroup * state_watcher;
 
-	ComplexMatrix <float> *rdd_params;
-	ComplexMatrix <float> *rdd_feedback;
+	AurynVector <float> * rdd_param_0;
+	AurynVector <float> * rdd_param_1;
+	AurynVector <float> * rdd_param_2;
+	AurynVector <float> * rdd_param_3;
+	AurynVector <float> * rdd_feedback;
 	AurynFloat fb_lr;
+	AurynVector <float> * betas;
+	bool learning_active;
 
 	/*! \brief Default constructor which sets up a random sparse matrix with fixed weight between the source and destination group. 
 	 *

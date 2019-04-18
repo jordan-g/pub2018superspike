@@ -20,6 +20,7 @@ do
 	OUTPUTDIR=../output/lfb/$RUN/eta$ETA
 	mkdir -p $OUTPUTDIR
 	make && mpirun -n 1 ./sim_lfb --nin 200 --nout $HEIGHT --grid $GRID --eta $ETA --input ../themes/${RUN}-input.ras --target ../themes/${RUN}-target.ras --simtime 20 --nhid $NHID --epsilon $EPSILON --delay 0.8e-3 --block 50 --w0 0.05 --layer 1 --dir $TMPDIR
+	# make && mpirun -n 1 ./sim_lfb --nin 200 --nout $HEIGHT --grid $GRID --eta $ETA --input ../themes/${RUN}-input.ras --target ../themes/${RUN}-target.ras --simtime 20 --nhid $NHID --epsilon $EPSILON --delay 0.8e-3 --block 50 --w0 0.2 --layer 1 --dir $TMPDIR
 	cp $TMPDIR/*.stats $TMPDIR/*.spk $OUTPUTDIR
 done
 

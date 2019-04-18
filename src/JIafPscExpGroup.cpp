@@ -54,6 +54,7 @@ void JIafPscExpGroup::init()
 	
 	bg_current = get_state_vector("bg_current");
 	temp = get_state_vector("_temp");
+	temp_2 = new AurynVector< AurynFloat > (get_vector_size());
 	ref = new AurynVector< unsigned short > (get_vector_size()); 
 	rdd = new AurynVector< unsigned short > (get_vector_size()); 
 	drive = new AurynVector< AurynFloat > (get_vector_size());
@@ -114,11 +115,15 @@ void JIafPscExpGroup::evolve()
 	temp->add(bg_current); // bg current
 	temp->add(syn_current); // syn_current
 
+	temp_2->diff(e_rest, drive); // leak current
+	temp_2->add(bg_current); // bg current
+	temp_2->add(syn_current); // syn_current
+
     // membrane dynamics
     mem->saxpy(scale_mem,temp);
 
     // input drive
-    drive->saxpy(scale_mem,temp);
+    drive->saxpy(scale_mem,temp_2);
 
 	// hard refractory time (clamped to zero)
 	for (NeuronID i = 0 ; i < get_rank_size() ; ++i ) {
@@ -134,24 +139,21 @@ void JIafPscExpGroup::evolve()
 		}
 
 		if (t_rdd[i]==0) {
-			if (t_mem[i]>thr-rdd_window && t_mem[i]<thr+rdd_window) {
-				t_rdd[i] += rdd_time;
-				t_max_drive[i] = -1000;
+			if (t_drive[i]>thr-rdd_window && t_drive[i]<thr+rdd_window) {
+				t_rdd[i] = rdd_time;
+				t_max_drive[i] = t_drive[i];
 			}
-
-			drive->copy(mem);
 		} else {
 			t_rdd[i]-- ;
 			if (t_max_drive[i] < t_drive[i]) {
 				t_max_drive[i] = t_drive[i];
 			}
+
+			if (t_rdd[i] == 0) {
+				t_drive[i] = t_mem[i];
+			}
 		}
-
 	}
-
-	// std::cout << t_rdd[0] << " ";
-
-
 
 	synapse_model->evolve();
 }

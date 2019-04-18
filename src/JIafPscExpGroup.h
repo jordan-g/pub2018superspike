@@ -90,6 +90,7 @@ public:
 
 	/*! \brief Temp vector */
 	AurynStateVector * temp;
+	AurynVector<AurynFloat> * temp_2;
 
 	/*! \brief Vector holding neuronspecific state of refractory period */
 	AurynVector<unsigned short> * ref;
